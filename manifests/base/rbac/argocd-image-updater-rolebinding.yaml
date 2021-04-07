@@ -8,7 +8,7 @@ metadata:
   name: argocd-image-updater
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: Role
+  kind: ClusterRole
   name: argocd-image-updater
 subjects:
   - kind: ServiceAccount
