@@ -5,3 +5,11 @@ metadata:
   labels:
     app.kubernetes.io/name: argocd-image-updater-config
     app.kubernetes.io/part-of: argocd-image-updater
+data:
+  registries.conf: |
+    registries:
+    - name: AWS Container Registry
+      api_url: https://283907186399.dkr.ecr.us-east-1.amazonaws.com
+      prefix: 283907186399.dkr.ecr.us-east-1.amazonaws.com
+      ping: no
+      credentials: pullsecret:default/aws-registry
