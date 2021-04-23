@@ -307,6 +307,65 @@ func Test_UpdateApplication(t *testing.T) {
 		assert.Equal(t, 0, res.NumImagesUpdated)
 	})
 
+	t.Run("Test update because of image registry changed", func(t *testing.T) {
+		mockClientFn := func(endpoint *registry.RegistryEndpoint, username, password string) (registry.RegistryClient, error) {
+			regMock := regmock.RegistryClient{}
+			regMock.On("Tags", mock.Anything).Return([]string{"1.0.1"}, nil)
+			return &regMock, nil
+		}
+
+		argoClient := argomock.ArgoCD{}
+		argoClient.On("UpdateSpec", mock.Anything, mock.Anything).Return(nil, nil)
+
+		kubeClient := kube.KubernetesClient{
+			Clientset: fake.NewFakeKubeClient(),
+		}
+		imageList := "foobar=gcr.io/jannfis/foobar:>=1.0.1"
+		appImages := &ApplicationImages{
+			Application: v1alpha1.Application{
+				ObjectMeta: v1.ObjectMeta{
+					Name:      "guestbook",
+					Namespace: "guestbook",
+					Annotations: map[string]string{
+						common.ImageUpdaterAnnotation:                                    imageList,
+						fmt.Sprintf(common.KustomizeApplicationNameAnnotation, "foobar"): "jannfis/foobar",
+						fmt.Sprintf(common.ForceUpdateOptionAnnotation, "foobar"):        "true",
+					},
+				},
+				Spec: v1alpha1.ApplicationSpec{
+					Source: v1alpha1.ApplicationSource{
+						Kustomize: &v1alpha1.ApplicationSourceKustomize{
+							Images: v1alpha1.KustomizeImages{
+								"jannfis/foobar:1.0.1",
+							},
+						},
+					},
+				},
+				Status: v1alpha1.ApplicationStatus{
+					SourceType: v1alpha1.ApplicationSourceTypeKustomize,
+					Summary: v1alpha1.ApplicationSummary{
+						Images: []string{
+							"jannfis/foobar:1.0.1",
+						},
+					},
+				},
+			},
+			Images: *parseImageList(imageList),
+		}
+		res := UpdateApplication(&UpdateConfiguration{
+			NewRegFN:   mockClientFn,
+			ArgoClient: &argoClient,
+			KubeClient: &kubeClient,
+			UpdateApp:  appImages,
+			DryRun:     false,
+		}, NewSyncIterationState())
+		assert.Equal(t, 0, res.NumErrors)
+		assert.Equal(t, 0, res.NumSkipped)
+		assert.Equal(t, 1, res.NumApplicationsProcessed)
+		assert.Equal(t, 1, res.NumImagesConsidered)
+		assert.Equal(t, 1, res.NumImagesUpdated)
+	})
+
 	t.Run("Test skip because of match-tag pattern doesn't match", func(t *testing.T) {
 		meta := make([]*schema1.SignedManifest, 4)
 		for i := 0; i < 4; i++ {
@@ -1257,7 +1316,7 @@ func Test_CommitUpdates(t *testing.T) {
 			args.Assert(t, "main")
 		}).Return(nil)
 		gitMock.On("Add", mock.Anything).Return(nil)
-		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 		wbc, err := getWriteBackConfig(&app, &kubeClient, &argoClient)
@@ -1276,7 +1335,7 @@ func Test_CommitUpdates(t *testing.T) {
 			args.Assert(t, "mybranch")
 		}).Return(nil)
 		gitMock.On("Add", mock.Anything).Return(nil)
-		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("SymRefToBranch", mock.Anything).Return("mydefaultbranch", nil)
 
@@ -1298,7 +1357,7 @@ func Test_CommitUpdates(t *testing.T) {
 			args.Assert(t, "mydefaultbranch")
 		}).Return(nil)
 		gitMock.On("Add", mock.Anything).Return(nil)
-		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("SymRefToBranch", mock.Anything).Return("mydefaultbranch", nil)
 		wbc, err := getWriteBackConfig(app, &kubeClient, &argoClient)
@@ -1320,7 +1379,7 @@ func Test_CommitUpdates(t *testing.T) {
 			args.Assert(t, "mydefaultbranch")
 		}).Return(nil)
 		gitMock.On("Add", mock.Anything).Return(nil)
-		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("SymRefToBranch", mock.Anything).Return("mydefaultbranch", nil)
 		gitMock.On("Config", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -1347,7 +1406,7 @@ func Test_CommitUpdates(t *testing.T) {
 			args.Assert(t, "mydefaultbranch")
 		}).Return(nil)
 		gitMock.On("Add", mock.Anything).Return(nil)
-		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("SymRefToBranch", mock.Anything).Return("mydefaultbranch", nil)
 		gitMock.On("Config", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -1370,7 +1429,7 @@ func Test_CommitUpdates(t *testing.T) {
 		gitMock.On("Init").Return(fmt.Errorf("cannot init"))
 		gitMock.On("Fetch").Return(nil)
 		gitMock.On("Checkout", mock.Anything).Return(nil)
-		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		wbc, err := getWriteBackConfig(&app, &kubeClient, &argoClient)
 		require.NoError(t, err)
@@ -1385,7 +1444,7 @@ func Test_CommitUpdates(t *testing.T) {
 		gitMock.On("Init").Return(nil)
 		gitMock.On("Fetch").Return(fmt.Errorf("cannot fetch"))
 		gitMock.On("Checkout", mock.Anything).Return(nil)
-		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		wbc, err := getWriteBackConfig(&app, &kubeClient, &argoClient)
 		require.NoError(t, err)
@@ -1399,7 +1458,7 @@ func Test_CommitUpdates(t *testing.T) {
 		gitMock.On("Init").Return(nil)
 		gitMock.On("Fetch").Return(nil)
 		gitMock.On("Checkout", mock.Anything).Return(fmt.Errorf("cannot checkout"))
-		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		wbc, err := getWriteBackConfig(&app, &kubeClient, &argoClient)
 		require.NoError(t, err)
@@ -1415,7 +1474,7 @@ func Test_CommitUpdates(t *testing.T) {
 		gitMock.On("Fetch").Return(nil)
 		gitMock.On("Checkout", mock.Anything).Return(nil)
 		gitMock.On("Add", mock.Anything).Return(nil)
-		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("cannot commit"))
+		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("cannot commit"))
 		gitMock.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		wbc, err := getWriteBackConfig(&app, &kubeClient, &argoClient)
 		require.NoError(t, err)
@@ -1431,7 +1490,7 @@ func Test_CommitUpdates(t *testing.T) {
 		gitMock.On("Fetch").Return(nil)
 		gitMock.On("Checkout", mock.Anything).Return(nil)
 		gitMock.On("Add", mock.Anything).Return(nil)
-		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("cannot push"))
 		wbc, err := getWriteBackConfig(&app, &kubeClient, &argoClient)
 		require.NoError(t, err)
@@ -1448,7 +1507,7 @@ func Test_CommitUpdates(t *testing.T) {
 		gitMock.On("Fetch").Return(nil)
 		gitMock.On("Checkout", mock.Anything).Return(nil)
 		gitMock.On("Add", mock.Anything).Return(nil)
-		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+		gitMock.On("Commit", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("Push", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		gitMock.On("SymRefToBranch", mock.Anything).Return("", fmt.Errorf("failed to resolve ref"))
 		wbc, err := getWriteBackConfig(app, &kubeClient, &argoClient)

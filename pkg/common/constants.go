@@ -28,10 +28,11 @@ const (
 
 // Upgrade strategy related annotations
 const (
-	OldMatchOptionAnnotation   = ImageUpdaterAnnotationPrefix + "/%s.tag-match" // Deprecated and will be removed
-	AllowTagsOptionAnnotation  = ImageUpdaterAnnotationPrefix + "/%s.allow-tags"
-	IgnoreTagsOptionAnnotation = ImageUpdaterAnnotationPrefix + "/%s.ignore-tags"
-	UpdateStrategyAnnotation   = ImageUpdaterAnnotationPrefix + "/%s.update-strategy"
+	OldMatchOptionAnnotation    = ImageUpdaterAnnotationPrefix + "/%s.tag-match" // Deprecated and will be removed
+	AllowTagsOptionAnnotation   = ImageUpdaterAnnotationPrefix + "/%s.allow-tags"
+	IgnoreTagsOptionAnnotation  = ImageUpdaterAnnotationPrefix + "/%s.ignore-tags"
+	ForceUpdateOptionAnnotation = ImageUpdaterAnnotationPrefix + "/%s.force-update"
+	UpdateStrategyAnnotation    = ImageUpdaterAnnotationPrefix + "/%s.update-strategy"
 )
 
 // Image pull secret related annotations
@@ -44,3 +45,11 @@ const (
 	WriteBackMethodAnnotation = ImageUpdaterAnnotationPrefix + "/write-back-method"
 	GitBranchAnnotation       = ImageUpdaterAnnotationPrefix + "/git-branch"
 )
+
+// The default Git commit message's template
+const DefaultGitCommitMessage = `build: automatic update of {{ .AppName }}
+
+{{ range .AppChanges -}}
+updates image {{ .Image }} tag '{{ .OldTag }}' to '{{ .NewTag }}'
+{{ end -}}
+`
